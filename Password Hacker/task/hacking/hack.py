@@ -11,16 +11,22 @@ def password_gen(chars):
             yield "".join(item)
 
 
-def crack(hostname, port):
+def crack(hostname, port, passwords):
     with socket.socket() as sock:
         sock.connect((hostname, port))
-        for p in password_gen(list(string.ascii_lowercase + string.digits)):
-            sock.send(p.encode())
-            res = sock.recv(1024)
-            if res.decode() == "Connection success!":
-                return p
-            elif res.decode() == "Too many attempts":
-                return False
+        for p in passwords:
+            for pc in map(lambda x: ''.join(x), itertools.product(*([letter.lower(), letter.upper()] for letter in p))):
+                sock.send(pc.encode())
+                res = sock.recv(1024)
+                if res.decode() == "Connection success!":
+                    return pc
+                elif res.decode() == "Too many attempts":
+                    return False
+
+
+def read_words():
+    with open('passwords.txt') as f:
+        return f.read().splitlines()
 
 
 def main():
@@ -28,8 +34,9 @@ def main():
     parser.add_argument("hostname", type=str)
     parser.add_argument("port", type=int)
     args = parser.parse_args(sys.argv[1:])
+    passwords = read_words()
     if args.hostname and args.port:
-        print(crack(args.hostname, args.port))
+        print(crack(args.hostname, args.port, passwords))
     else:
         print("Incorrect parameters")
 

